@@ -202,13 +202,17 @@ func restoreRdbEntry(c redigo.Conn, e *rdb.BinEntry) {
 			ttlms = e.ExpireAt - now
 		}
 	}
-	s, err := redigo.String(c.Do("slotsrestore", e.Key, ttlms, e.Value))
-	if err != nil {
-		log.PanicError(err, "restore command error")
-	}
-	if s != "OK" {
-		log.Panicf("restore command response = '%s', should be 'OK'", s)
-	}
+
+    s := string(e.Key[:])
+    if strings.Contains(s, "564c13b8f085fc471efdfff8") {
+        s, err := redigo.String(c.Do("restore", e.Key, ttlms, e.Value, "REPLACE"))
+        if err != nil {
+            log.Info(err, "restore command error key:%s", e.Key)
+        }
+        if s != "OK" {
+            log.Info("restore command response = '%s', should be 'OK'", s)
+        }
+    }
 }
 
 func iocopy(r io.Reader, w io.Writer, p []byte, max int) int {

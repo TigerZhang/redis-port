@@ -223,7 +223,7 @@ func (cmd *cmdSync) SyncRDBFile(reader *bufio.Reader, target, passwd string, nsi
 		select {
 		case <-wait:
 			done = true
-		case <-time.After(time.Second):
+		case <-time.After(time.Millisecond):
 		}
 		stat := cmd.Stat()
 		var b bytes.Buffer
@@ -281,7 +281,7 @@ func (cmd *cmdSync) SyncCommand(reader *bufio.Reader, target, passwd string) {
 	}()
 
 	for lstat := cmd.Stat(); ; {
-		time.Sleep(time.Second)
+		time.Sleep(time.Second*3)
 		nstat := cmd.Stat()
 		var b bytes.Buffer
 		fmt.Fprintf(&b, "sync: ")

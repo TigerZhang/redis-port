@@ -19,7 +19,14 @@ import (
 	"github.com/wandoulabs/redis-port/pkg/libs/stats"
 	"github.com/wandoulabs/redis-port/pkg/rdb"
 	"github.com/wandoulabs/redis-port/pkg/redis"
+	"fmt"
+	"bytes"
 )
+
+type ScorePair struct {
+	Score  int64
+	Member []byte
+}
 
 func openRedisConn(target, passwd string) redigo.Conn {
 	return redigo.NewConn(openNetConn(target, passwd), 0, 0)
@@ -191,6 +198,166 @@ func selectDB(c redigo.Conn, db uint32) {
 	}
 }
 
+// TFS data demo
+//
+// $ redis-cli smembers etf:F:/564c13b8f085fc471efdfff8/user_broadcast_277732900865/p/0
+// 1) "FS:/564c13b8f085fc471efdfff8/user_broadcast_277732900865/p/0:59"
+// 2) "FS:/564c13b8f085fc471efdfff8/user_broadcast_277732900865/p/0:40"
+// 3) "FS:/564c13b8f085fc471efdfff8/user_broadcast_277732900865/p/0:4"
+// 4) "FS:/564c13b8f085fc471efdfff8/user_broadcast_277732900865/p/0:64"
+// 5) "FS:/564c13b8f085fc471efdfff8/user_broadcast_277732900865/p/0:51"
+// 6) "FS:/564c13b8f085fc471efdfff8/user_broadcast_277732900865/p/0:39"
+//
+// 8) "etf:F:/uid_topics/2582603978711672192"
+// 9) "etf:F:/uid_topics/2577045856928281216"
+//
+// $ redis-cli smembers etf:FS:/564c13b8f085fc471efdfff8/user_broadcast_277732900865/p/0:65
+// 1) "2580471980996094976"
+// 2) "2580472943194598400"
+// 3) "2580601451761804672"
+
+// use zset instead of set for yunba tfs
+func yunba_tfs_set_to_zset_restore_cmd(c redigo.Conn, ignore *bool, modify *bool, key []byte, data []byte) error {
+	//                 |  previous value    |    after value
+	//-----------------|--------------------|----------------------------------------------------------
+	// topic File      | set of File Slice  | zset of UIDs.
+	//                 |                    | Use the front ID as score of UID, if the user is oneline.
+	//                 |                    | The score will be 0 if the UID is offline.
+	//-----------------|--------------------|----------------------------------------------------------
+	// topic FileSlice | set of UIDs        | None. Will be ignored
+	//-----------------|--------------------|----------------------------------------------------------
+	// subed topics of | set of topics      |
+	//     UID         |                    |
+
+	*modify = false
+	*ignore = false
+
+	tfs_fs_prefix := []byte("etf:FS:")
+	tfs_f_prefix := []byte("etf:F:")
+	tfs_f_uid_topics_prefix := []byte("etf:F:/uid_topics")
+
+	is_fs := true
+	for i := range tfs_fs_prefix {
+		if tfs_fs_prefix[i] != key[i] {
+			is_fs = false
+			break
+		}
+	}
+
+	if is_fs {
+		*ignore = false
+	}
+
+	is_f_uid_topics := true
+	for i := range tfs_f_uid_topics_prefix {
+		if tfs_f_uid_topics_prefix[i] != key[i] {
+			is_f_uid_topics = false
+		}
+	}
+
+	if is_f_uid_topics {
+		*ignore = false
+	} else {
+		is_f := true
+		for i := range tfs_f_prefix {
+			if tfs_f_prefix[i] != key[i] {
+				is_f = false
+			}
+		}
+
+		if is_f {
+			*ignore = true
+		}
+	}
+
+	if is_f_uid_topics {
+		// do NOT modify the key/value
+		return nil
+	} else if is_fs {
+		*modify = true
+		// insert the UIDs to a new zset with the key of File
+	}
+
+	if c == nil {
+		// ignore write operation
+		return nil
+	}
+
+	b := make([][]byte, 16)
+	b[0] = key
+
+	o, err := rdb.DecodeDump(data)
+	if err != nil {
+		return err
+	}
+
+	switch value := o.(type) {
+	case rdb.Set:
+		// convert to zset
+		// "etf:FS:/564c13b8f085fc471efdfff8/user_broadcast_277732900865/p/0:59"
+	    // "etf:FS:/<appkey>/<topic>[/topic]:<slice-num>"
+		newKey, _ := set_key_to_zset_key(key)
+		if c != nil {
+//			sp := make([]ScorePair, len(value))
+			for _, v := range value {
+//				sp[0].Score = 0
+//				sp[0].Member = v
+				c.Do("zadd", newKey, "0", v)
+			}
+		}
+	case rdb.String:
+		value = value
+	case rdb.Hash:
+		value = value
+	case rdb.ZSet:
+		// ignore
+		value = value
+	default:
+		fmt.Printf("invalid data type %T", o)
+	}
+
+	return nil
+}
+
+func yunba_tfs_set_cmd_to_zset_cmd(args [][]byte) ([][]byte, error) {
+	// convert sadd to zadd
+	var ignore, modify bool
+	yunba_tfs_set_to_zset_restore_cmd(nil, &ignore, &modify, args[0], nil)
+	fmt.Printf("ignore %v modify %v\n", ignore, modify)
+	if ignore == false {
+		if modify {
+			newKey, _ := set_key_to_zset_key([]byte(args[0]))
+			fmt.Printf("newkey: %s\n", string(newKey))
+
+			zsetArgs := make([][]byte, 0)
+			zsetArgs = append(zsetArgs, newKey)
+			for _, elem := range args[1:] {
+				zsetArgs = append(zsetArgs, []byte{'0'})
+				zsetArgs = append(zsetArgs, elem)
+			}
+
+			return zsetArgs, nil
+		}
+	}
+
+	return nil, errors.Errorf("%s", "ignored")
+}
+
+func set_key_to_zset_key(key []byte) ([]byte, error) {
+	splits := bytes.Split(key, []byte{':'})
+	//		fmt.Printf("etf: %s\n", string(splits[0]))
+	//		fmt.Printf("FS: %s\n", string(splits[1]))
+	//		fmt.Printf("Topic: %s\n", string(splits[2]))
+	//		fmt.Printf("Slice: %s\n", string(splits[3]))
+	// new key
+	newKey := make([]byte, 0)
+	newKey = append(newKey, splits[0]...)
+	newKey = append(newKey, []byte{':', 'F', ':'}...)
+	newKey = append(newKey, splits[2]...)
+
+	return newKey, nil
+}
+
 func restoreRdbEntry(c redigo.Conn, e *rdb.BinEntry) {
 	var ttlms uint64
 	if e.ExpireAt != 0 {
@@ -203,16 +370,22 @@ func restoreRdbEntry(c redigo.Conn, e *rdb.BinEntry) {
 		}
 	}
 
-    s := string(e.Key[:])
-    if strings.Contains(s, "564c13b8f085fc471efdfff8") {
-        s, err := redigo.String(c.Do("restore", e.Key, ttlms, e.Value, "REPLACE"))
-        if err != nil {
-            log.Info(err, "restore command error key:%s", e.Key)
-        }
-        if s != "OK" {
-            log.Info("restore command response = '%s', should be 'OK'", s)
-        }
-    }
+	var ignore, modify bool
+
+	yunba_tfs_set_to_zset_restore_cmd(c, &ignore, &modify, e.Key, e.Value)
+
+	ttlms = ttlms
+
+//    s := string(e.Key[:])
+//    if strings.Contains(s, "564c13b8f085fc471efdfff8") {
+//        s, err := redigo.String(c.Do("restore", e.Key, ttlms, e.Value, "REPLACE"))
+//        if err != nil {
+//            log.Info(err, "restore command error key:%s", e.Key)
+//        }
+//        if s != "OK" {
+//            log.Info("restore command response = '%s', should be 'OK'", s)
+//        }
+//    }
 }
 
 func iocopy(r io.Reader, w io.Writer, p []byte, max int) int {

@@ -255,7 +255,9 @@ func (cmd *cmdSync) SyncCommand(reader *bufio.Reader, target, passwd string) {
 		var bypass bool = false
 		for {
 			resp := redis.MustDecode(reader)
-			if scmd, args, err := redis.ParseArgs(resp); err != nil {
+			scmd, args, err := redis.ParseArgs(resp)
+			fmt.Printf("cmd: %s args: %v\n", scmd, args)
+			if err != nil {
 				log.PanicError(err, "parse command arguments failed")
 			} else if scmd != "ping" {
 				if scmd == "select" {
@@ -273,8 +275,34 @@ func (cmd *cmdSync) SyncCommand(reader *bufio.Reader, target, passwd string) {
 					cmd.nbypass.Incr()
 					continue
 				}
+
+				if scmd == "sadd" {
+					// TODO: 1. extact to a function; 2. test case
+					fmt.Printf("sadd command\n")
+					if zsetArgs, err := yunba_tfs_set_cmd_to_zset_cmd(args); err == nil {
+						if zsetArgs != nil {
+							s := make([]interface{}, len(zsetArgs))
+							for i := range zsetArgs {
+								s[i] = zsetArgs[i]
+							}
+							resp = redis.NewCommand("zadd", s...)
+						}
+
+						for i, a := range zsetArgs {
+							fmt.Printf("zsetArgs[%d]: %s\n", i, string(a))
+						}
+					}
+				}
 			}
+
 			cmd.forward.Incr()
+
+			scmd, args, err = redis.ParseArgs(resp)
+			fmt.Printf("resp scmd : %s\n", scmd)
+			for i, a := range args {
+				fmt.Printf("args[%d]: %s\n", i, a)
+			}
+
 			redis.MustEncode(writer, resp)
 			flushWriter(writer)
 		}

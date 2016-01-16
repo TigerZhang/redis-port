@@ -198,6 +198,24 @@ func selectDB(c redigo.Conn, db uint32) {
 	}
 }
 
+func byte_array_startswith(ba []byte, prefix []byte) (bool) {
+	len := len(ba)
+	result := true
+	for i := range prefix {
+		if i >= len {
+			result = false
+			break
+		}
+
+		if ba[i] != prefix[i] {
+			result = false
+			break
+		}
+	}
+
+	return result
+}
+
 // TFS data demo
 //
 // $ redis-cli smembers etf:F:/564c13b8f085fc471efdfff8/user_broadcast_277732900865/p/0
@@ -230,41 +248,22 @@ func yunba_tfs_set_to_zset_restore_cmd(c redigo.Conn, ignore *bool, modify *bool
 	//     UID         |                    |
 
 	*modify = false
-	*ignore = false
+	*ignore = true
 
 	tfs_fs_prefix := []byte("etf:FS:")
 	tfs_f_prefix := []byte("etf:F:")
 	tfs_f_uid_topics_prefix := []byte("etf:F:/uid_topics")
 
-	is_fs := true
-	for i := range tfs_fs_prefix {
-		if tfs_fs_prefix[i] != key[i] {
-			is_fs = false
-			break
-		}
-	}
-
+	is_fs := byte_array_startswith(key, tfs_fs_prefix)
 	if is_fs {
 		*ignore = false
 	}
 
-	is_f_uid_topics := true
-	for i := range tfs_f_uid_topics_prefix {
-		if tfs_f_uid_topics_prefix[i] != key[i] {
-			is_f_uid_topics = false
-		}
-	}
-
+	is_f_uid_topics := byte_array_startswith(key, tfs_f_uid_topics_prefix)
 	if is_f_uid_topics {
 		*ignore = false
 	} else {
-		is_f := true
-		for i := range tfs_f_prefix {
-			if tfs_f_prefix[i] != key[i] {
-				is_f = false
-			}
-		}
-
+		is_f := byte_array_startswith(key, tfs_f_prefix)
 		if is_f {
 			*ignore = true
 		}

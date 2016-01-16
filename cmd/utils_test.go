@@ -9,6 +9,8 @@ import (
 
 	pelicantun "github.com/mailgun/pelican-protocol/tun"
 	"reflect"
+
+//	"github.com/stvp/tempredis"
 )
 
 var (
@@ -67,6 +69,10 @@ func Test_yunba_tfs_set_to_zset(t *testing.T) {
 	assert.Must(ignore == false)
 	assert.Must(modify == true)
 
+	yunba_tfs_set_to_zset_restore_cmd(c, &ignore, &modify, []byte{'a'}, data_fs.([]byte))
+	assert.Must(ignore == true)
+	assert.Must(modify == false)
+
 	i, b, err := pelicantun.Base36toBigInt([]byte("abj"))
 	fmt.Printf("abj-> %v %v\n", i, b)
 
@@ -116,4 +122,12 @@ func Test_yunba_tfs_set_to_zset(t *testing.T) {
 	yunba_tfs_set_to_zset_restore_cmd(nil, &ignore, &modify, []byte(key_f_uid), data)
 	assert.Must(ignore == false)
 	assert.Must(modify == false)
+}
+
+func Test_byte_array_startswith(t *testing.T) {
+	assert.Must(byte_array_startswith([]byte{}, []byte{}))
+	assert.Must(byte_array_startswith([]byte{'a', 'b'}, []byte{}))
+	assert.Must(byte_array_startswith([]byte{'a', 'b'}, []byte{'a', 'b'}))
+	assert.Must(byte_array_startswith([]byte{'a', 'b', 'c'}, []byte{'a', 'b'}))
+	assert.Must(byte_array_startswith([]byte{'a', 'b', 'c'}, []byte{'a', 'b', 'c', 'd'}) == false)
 }

@@ -291,6 +291,8 @@ func (cmd *cmdSync) SyncCommand(reader *bufio.Reader, target, passwd string) {
 						for i, a := range zsetArgs {
 							fmt.Printf("zsetArgs[%d]: %s\n", i, string(a))
 						}
+					} else  {
+						continue
 					}
 				}
 			}

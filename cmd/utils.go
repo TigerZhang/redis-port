@@ -291,6 +291,10 @@ func yunba_tfs_set_to_zset_restore_cmd(c redigo.Conn, ignore *bool, modify *bool
 		return err
 	}
 
+	if *ignore {
+		return nil
+	}
+
 	switch value := o.(type) {
 	case rdb.Set:
 		// convert to zset

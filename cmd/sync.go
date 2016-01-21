@@ -279,19 +279,35 @@ func (cmd *cmdSync) SyncCommand(reader *bufio.Reader, target, passwd string) {
 				if scmd == "sadd" {
 					// TODO: 1. extact to a function; 2. test case
 					fmt.Printf("sadd command\n")
-					if zsetArgs, err := yunba_tfs_set_cmd_to_zset_cmd(args); err == nil {
-						if zsetArgs != nil {
-							s := make([]interface{}, len(zsetArgs))
-							for i := range zsetArgs {
-								s[i] = zsetArgs[i]
+					if zaddArgs, err := yunba_tfs_sadd_cmd_to_zadd_cmd(args); err == nil {
+						if zaddArgs != nil {
+							s := make([]interface{}, len(zaddArgs))
+							for i := range zaddArgs {
+								s[i] = zaddArgs[i]
 							}
 							resp = redis.NewCommand("zadd", s...)
 						}
 
-						for i, a := range zsetArgs {
+						for i, a := range zaddArgs {
 							fmt.Printf("zsetArgs[%d]: %s\n", i, string(a))
 						}
 					} else  {
+						continue
+					}
+				} else if scmd == "srem" {
+					fmt.Printf("srem command\n")
+					if zremArgs, err := yunba_tfs_srem_cmd_to_zrem_cmd(args); err == nil {
+						if zremArgs != nil {
+							s := make([]interface{}, len(zremArgs))
+							for i := range zremArgs {
+								s[i] = zremArgs[i]
+							}
+							resp = redis.NewCommand("zrem", s...)
+						}
+						for i, a := range zremArgs {
+							fmt.Printf("zremArgs[%d]: %s\n", i, string(a))
+						}
+					} else {
 						continue
 					}
 				}

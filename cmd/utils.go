@@ -23,6 +23,12 @@ import (
 	"bytes"
 )
 
+var (
+	tfs_fs_prefix			= []byte("etf:FS:")
+	tfs_f_prefix			= []byte("etf:F:")
+	tfs_f_uid_topics_prefix	= []byte("etf:F:/uid_topics")
+)
+
 type ScorePair struct {
 	Score  int64
 	Member []byte
@@ -216,6 +222,34 @@ func byte_array_startswith(ba []byte, prefix []byte) (bool) {
 	return result
 }
 
+func modify_or_ignore(key []byte, ignore, modify *bool) {
+	*modify = false
+	*ignore = true
+
+	is_fs := byte_array_startswith(key, tfs_fs_prefix)
+	if is_fs {
+		*ignore = false
+	}
+
+	is_f_uid_topics := byte_array_startswith(key, tfs_f_uid_topics_prefix)
+	if is_f_uid_topics {
+		*ignore = false
+	} else {
+		is_f := byte_array_startswith(key, tfs_f_prefix)
+		if is_f {
+			*ignore = true
+		}
+	}
+
+	if is_f_uid_topics {
+		// do NOT modify the key/value
+		return
+	} else if is_fs {
+		*modify = true
+		// insert the UIDs to a new zset with the key of File
+	}
+}
+
 // TFS data demo
 //
 // $ redis-cli smembers etf:F:/564c13b8f085fc471efdfff8/user_broadcast_277732900865/p/0
@@ -247,38 +281,14 @@ func yunba_tfs_set_to_zset_restore_cmd(c redigo.Conn, ignore *bool, modify *bool
 	// subed topics of | set of topics      |
 	//     UID         |                    |
 
-	*modify = false
-	*ignore = true
-
-	tfs_fs_prefix := []byte("etf:FS:")
-	tfs_f_prefix := []byte("etf:F:")
-	tfs_f_uid_topics_prefix := []byte("etf:F:/uid_topics")
-
-	is_fs := byte_array_startswith(key, tfs_fs_prefix)
-	if is_fs {
-		*ignore = false
-	}
-
-	is_f_uid_topics := byte_array_startswith(key, tfs_f_uid_topics_prefix)
-	if is_f_uid_topics {
-		*ignore = false
-	} else {
-		is_f := byte_array_startswith(key, tfs_f_prefix)
-		if is_f {
-			*ignore = true
-		}
-	}
-
-	if is_f_uid_topics {
-		// do NOT modify the key/value
-		return nil
-	} else if is_fs {
-		*modify = true
-		// insert the UIDs to a new zset with the key of File
-	}
+	modify_or_ignore(key, ignore, modify)
 
 	if c == nil {
 		// ignore write operation
+		return nil
+	}
+
+	if data == nil {
 		return nil
 	}
 
@@ -322,7 +332,7 @@ func yunba_tfs_set_to_zset_restore_cmd(c redigo.Conn, ignore *bool, modify *bool
 	return nil
 }
 
-func yunba_tfs_set_cmd_to_zset_cmd(args [][]byte) ([][]byte, error) {
+func yunba_tfs_sadd_cmd_to_zadd_cmd(args [][]byte) ([][]byte, error) {
 	// convert sadd to zadd
 	var ignore, modify bool
 	yunba_tfs_set_to_zset_restore_cmd(nil, &ignore, &modify, args[0], nil)
@@ -343,7 +353,30 @@ func yunba_tfs_set_cmd_to_zset_cmd(args [][]byte) ([][]byte, error) {
 		}
 	}
 
-	return nil, errors.Errorf("%s", "ignored")
+	return nil, errors.Errorf("ignored")
+}
+
+func yunba_tfs_srem_cmd_to_zrem_cmd(args [][]byte) ([][]byte, error) {
+	var ignore, modify bool
+
+	key := args[0]
+	modify_or_ignore(key, &ignore, &modify)
+	if ignore == false {
+		if modify {
+			newKey, _ := set_key_to_zset_key(key)
+			fmt.Printf("newkey: %s\n", string(newKey))
+
+			zremArgs := make([][]byte, 0)
+			zremArgs = append(zremArgs, newKey)
+			for _, elem := range args[1:] {
+				zremArgs = append(zremArgs, elem)
+			}
+
+			return zremArgs, nil
+		}
+	}
+
+	return nil, errors.Errorf("ignored")
 }
 
 func set_key_to_zset_key(key []byte) ([]byte, error) {

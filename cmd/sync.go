@@ -223,7 +223,7 @@ func (cmd *cmdSync) SyncRDBFile(reader *bufio.Reader, target, passwd string, nsi
 		select {
 		case <-wait:
 			done = true
-		case <-time.After(time.Millisecond):
+		case <-time.After(time.Second*3):
 		}
 		stat := cmd.Stat()
 		var b bytes.Buffer

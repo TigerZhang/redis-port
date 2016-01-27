@@ -7,7 +7,7 @@ import (
 	"flag"
 	"fmt"
 
-	pelicantun "github.com/mailgun/pelican-protocol/tun"
+//	pelicantun "github.com/mailgun/pelican-protocol/tun"
 	"reflect"
 
 	"github.com/stvp/tempredis"
@@ -39,16 +39,16 @@ func Test_yunba_tfs_set_to_zset(t *testing.T) {
 
 	defer redisPool.Close()
 
-	redisPoolTarget := redis.NewPool(func() (redis.Conn, error) {
-		ct, err := redis.Dial("tcp", ":" + redisPortTarget)
-
-		if err != nil {
-			return nil, err
-		}
-
-		return ct, err
-	}, *maxConnections)
-	defer redisPoolTarget.Close()
+//	redisPoolTarget := redis.NewPool(func() (redis.Conn, error) {
+//		ct, err := redis.Dial("tcp", ":" + redisPortTarget)
+//
+//		if err != nil {
+//			return nil, err
+//		}
+//
+//		return ct, err
+//	}, *maxConnections)
+//	defer redisPoolTarget.Close()
 
 	var ignore, modify bool
 	var data []byte
@@ -64,8 +64,8 @@ func Test_yunba_tfs_set_to_zset(t *testing.T) {
 	c := redisPool.Get()
 	defer c.Close()
 
-	ct := redisPoolTarget.Get()
-	defer ct.Close()
+//	ct := redisPoolTarget.Get()
+//	defer ct.Close()
 
 	_, err := c.Do("DEL", key_fs)
 	assert.MustNoError(err)
@@ -83,7 +83,7 @@ func Test_yunba_tfs_set_to_zset(t *testing.T) {
 	assert.MustNoError(err)
 	fmt.Printf("data dump: %v\n", data_fs)
 
-	yunba_tfs_set_to_zset_restore_cmd(nil, &ignore, &modify, []byte(key_f), data)
+	yunba_tfs_set_to_zset_restore_cmd(nil, &ignore, &modify, []byte(key_f), data, nil)
 	assert.Must(ignore == true)
 	assert.Must(modify == false)
 
@@ -91,38 +91,38 @@ func Test_yunba_tfs_set_to_zset(t *testing.T) {
 //	assert.Must(ignore == false)
 //	assert.Must(modify == true)
 
-	yunba_tfs_set_to_zset_restore_cmd(c, &ignore, &modify, []byte(key_fs), data_fs.([]byte))
+	yunba_tfs_set_to_zset_restore_cmd(c, &ignore, &modify, []byte(key_fs), data_fs.([]byte), nil)
 	assert.Must(ignore == false)
 	assert.Must(modify == true)
 
-	yunba_tfs_set_to_zset_restore_cmd(c, &ignore, &modify, []byte{'a'}, data_fs.([]byte))
+	yunba_tfs_set_to_zset_restore_cmd(c, &ignore, &modify, []byte{'a'}, data_fs.([]byte), nil)
 	assert.Must(ignore == true)
 	assert.Must(modify == false)
 
-	i, b, err := pelicantun.Base36toBigInt([]byte("abj"))
-	fmt.Printf("abj-> %v %v\n", i, b)
-
-	b, s := pelicantun.BigIntToBase36(i)
-	fmt.Printf("abj<- %s %v\n", b, s)
-
-	i, b, err = pelicantun.Base36toBigInt([]byte("front"))
-	fmt.Printf("front-> %v %v\n", i, b)
-
-	b, s = pelicantun.BigIntToBase36(i)
-	fmt.Printf("front<- %s %v\n", b, s)
-
-
-	i, b, err = pelicantun.Base36toBigInt([]byte("zzb1"))
-	fmt.Printf("zzb1-> %v %v\n", i, b)
-
-	b, s = pelicantun.BigIntToBase36(i)
-	fmt.Printf("zzb1<- %s %v\n", b, s)
-
-	i, b, err = pelicantun.Base36toBigInt([]byte("zzzzz"))
-	fmt.Printf("zzzzz-> %v %v\n", i, b)
-
-	b, s = pelicantun.BigIntToBase36(i)
-	fmt.Printf("zzzzz<- %s %v\n", b, s)
+//	i, b, err := pelicantun.Base36toBigInt([]byte("abj"))
+//	fmt.Printf("abj-> %v %v\n", i, b)
+//
+//	b, s := pelicantun.BigIntToBase36(i)
+//	fmt.Printf("abj<- %s %v\n", b, s)
+//
+//	i, b, err = pelicantun.Base36toBigInt([]byte("front"))
+//	fmt.Printf("front-> %v %v\n", i, b)
+//
+//	b, s = pelicantun.BigIntToBase36(i)
+//	fmt.Printf("front<- %s %v\n", b, s)
+//
+//
+//	i, b, err = pelicantun.Base36toBigInt([]byte("zzb1"))
+//	fmt.Printf("zzb1-> %v %v\n", i, b)
+//
+//	b, s = pelicantun.BigIntToBase36(i)
+//	fmt.Printf("zzb1<- %s %v\n", b, s)
+//
+//	i, b, err = pelicantun.Base36toBigInt([]byte("zzzzz"))
+//	fmt.Printf("zzzzz-> %v %v\n", i, b)
+//
+//	b, s = pelicantun.BigIntToBase36(i)
+//	fmt.Printf("zzzzz<- %s %v\n", b, s)
 
 	setArgs := make([][]byte, 0)
 	setArgs = append(setArgs, []byte(key_fs))
@@ -145,9 +145,38 @@ func Test_yunba_tfs_set_to_zset(t *testing.T) {
 		assert.Must(reply[2*i+1] == "0")
 	}
 
-	yunba_tfs_set_to_zset_restore_cmd(nil, &ignore, &modify, []byte(key_f_uid), data)
+	yunba_tfs_set_to_zset_restore_cmd(nil, &ignore, &modify, []byte(key_f_uid), data, nil)
 	assert.Must(ignore == false)
 	assert.Must(modify == false)
+
+	customerId, serverId := splitCustomerIdServerId("1")
+	assert.Must(customerId == 0)
+	assert.Must(serverId == 1)
+
+	customerId, serverId = splitCustomerIdServerId("10")
+	assert.Must(customerId == 0)
+	assert.Must(serverId == 10)
+
+	customerId, serverId = splitCustomerIdServerId("zb10")
+	assert.Must(customerId == 3)
+	assert.Must(serverId == 10)
+
+	customerId, serverId = splitCustomerIdServerId("bbg10")
+	assert.Must(customerId == 4)
+	assert.Must(serverId == 10)
+
+	assert.Must(front_tag_to_score("abj-front-1") == 1<<24 + 1)
+	assert.Must(front_tag_to_score("abj-front-10") == 1<<24 + 10)
+	assert.Must(front_tag_to_score("abj-front-zb1") == 1<<24 + 3<<16 + 1)
+	assert.Must(front_tag_to_score("abj-front-zb9") == 1<<24 + 3<<16 + 9)
+	assert.Must(front_tag_to_score("abj-front-bbg1") == 1<<24 + 4<<16 + 1)
+	assert.Must(front_tag_to_score("abj-front-bbg9") == 1<<24 + 4<<16 + 9)
+
+	assert.Must(routeTableStringToScore("abj-front-1$0") == "0")
+	assert.Must(routeTableStringToScore("abj-front-1$1") == fmt.Sprint(front_tag_to_score("abj-front-1")))
+
+	assert.Must(routeTableStringToScore("abj-front-zb1$0") == "0")
+	assert.Must(routeTableStringToScore("abj-front-zb1$1") == fmt.Sprint(front_tag_to_score("abj-front-zb1")))
 }
 
 func Test_byte_array_startswith(t *testing.T) {

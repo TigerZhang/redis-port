@@ -31,6 +31,8 @@ var args struct {
 
 	shift time.Duration
 	psync bool
+
+	redisrt string
 }
 
 const (
@@ -64,7 +66,7 @@ Usage:
 	redis-port decode   [--ncpu=N]  [--parallel=M]  [--input=INPUT]  [--output=OUTPUT]
 	redis-port restore  [--ncpu=N]  [--parallel=M]  [--input=INPUT]   --target=TARGET   [--auth=AUTH]  [--extra] [--faketime=FAKETIME]  [--filterdb=DB]
 	redis-port dump     [--ncpu=N]  [--parallel=M]   --from=MASTER   [--password=PASSWORD]  [--output=OUTPUT]  [--extra]
-	redis-port sync     [--ncpu=N]  [--parallel=M]   --from=MASTER   [--password=PASSWORD]   --target=TARGET   [--auth=AUTH]  [--sockfile=FILE [--filesize=SIZE]] [--filterdb=DB] [--psync]
+	redis-port sync     [--ncpu=N]  [--parallel=M]   --from=MASTER   [--password=PASSWORD]   --target=TARGET   [--auth=AUTH]  [--sockfile=FILE [--filesize=SIZE]] [--filterdb=DB] [--psync] [--redisrt=REDISRT]
 
 Options:
 	-n N, --ncpu=N                    Set runtime.GOMAXPROCS to N.
@@ -81,6 +83,7 @@ Options:
 	-e, --extra                       Set ture to send/receive following redis commands, default is false.
 	--filterdb=DB                     Filter db = DB, default is *.
 	--psync                           Use PSYNC command.
+	-r REDISRT, --redisrt REDISRT     Set host:port of route table redis.
 `
 	d, err := docopt.Parse(usage, nil, true, "", false)
 	if err != nil {
@@ -121,6 +124,8 @@ Options:
 	args.extra, _ = d["--extra"].(bool)
 	args.psync, _ = d["--psync"].(bool)
 	args.sockfile, _ = d["--sockfile"].(string)
+
+	args.redisrt, _ = d["--redisrt"].(string)
 
 	if s, ok := d["--faketime"].(string); ok && s != "" {
 		switch s[0] {

@@ -18,12 +18,16 @@ import (
 	"github.com/wandoulabs/redis-port/pkg/libs/log"
 	"github.com/wandoulabs/redis-port/pkg/libs/stats"
 	"github.com/wandoulabs/redis-port/pkg/redis"
+
+	goredis "gopkg.in/redis.v3"
 )
 
 type cmdSync struct {
 	rbytes, wbytes, nentry, ignore atomic2.Int64
 
 	forward, nbypass atomic2.Int64
+
+	redisrt *goredis.Client
 }
 
 type cmdSyncStat struct {
@@ -51,6 +55,20 @@ func (cmd *cmdSync) Main() {
 	}
 	if len(target) == 0 {
 		log.Panic("invalid argument: target")
+	}
+
+	if len(args.redisrt) > 0 {
+		redisrt := goredis.NewClient(&goredis.Options{
+			Addr:     args.redisrt,
+			Password: "", // no password set
+			DB:       0,  // use default DB
+		})
+
+		if _, err := redisrt.Ping().Result(); err != nil {
+			log.Panic("ping route table redis failed")
+		}
+
+		cmd.redisrt = redisrt
 	}
 
 	log.Infof("sync from '%s' to '%s'\n", from, target)
@@ -209,7 +227,7 @@ func (cmd *cmdSync) SyncRDBFile(reader *bufio.Reader, target, passwd string, nsi
 							lastdb = e.DB
 							selectDB(c, lastdb)
 						}
-						restoreRdbEntry(c, e)
+						restoreRdbEntry(c, e, cmd.redisrt)
 					}
 				}
 			}()

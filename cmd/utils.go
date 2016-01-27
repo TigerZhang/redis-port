@@ -21,6 +21,8 @@ import (
 	"github.com/wandoulabs/redis-port/pkg/redis"
 	"fmt"
 	"bytes"
+
+	goredis "gopkg.in/redis.v3"
 )
 
 var (
@@ -250,6 +252,85 @@ func modify_or_ignore(key []byte, ignore, modify *bool) {
 	}
 }
 
+func splitCustomerIdServerId(customer_id_server_id string) (uint32, uint32) {
+	i := 0
+	hasCustomerId := false
+	for i < len(customer_id_server_id) {
+		if customer_id_server_id[i] >= '0' && customer_id_server_id[i] <= '9' {
+			if i > 0 {
+				hasCustomerId = true
+			}
+			break
+		}
+
+		i += 1
+	}
+
+	if hasCustomerId {
+		a := []byte(customer_id_server_id)
+
+		customer_id := a[:i]
+		server_id := a[i:]
+		c := customerIdStringToInt(string(customer_id))
+		s, _ := strconv.ParseUint(string(server_id), 10, 32)
+
+		return c, uint32(s)
+	} else {
+		s, _ := strconv.ParseUint(customer_id_server_id, 10, 32)
+
+		return 0, uint32(s)
+	}
+}
+
+func customerIdStringToInt(customerId string) uint32 {
+	switch customerId {
+	case "xp":
+		return 1
+	case "jb":
+		return 2
+	case "zb":
+		return 3
+	case "bbg":
+		return 4
+	}
+
+	return 0
+}
+
+// IDC number * 0xFFFFFF + customer ID * 0xFFFF + server ID
+//
+// IDCs
+// abj: 1
+//
+// customer ID
+// xp: 1
+// jb: 2
+// zb: 3
+// bbg: 4
+//
+func front_tag_to_score(front_tag string) uint32 {
+	var score uint32
+	score = 0
+	var idc, customer_id, server_id uint32
+	idc = 0
+	customer_id = 0
+	server_id = 0
+
+	split := strings.Split(front_tag, "-")
+	if len(split) == 3 {
+		switch split[0] {
+		case "abj":
+			idc = 1
+		}
+
+		customer_id, server_id = splitCustomerIdServerId(split[2])
+
+		score = idc << 24 | customer_id << 16 | server_id
+	}
+
+	return score
+}
+
 // TFS data demo
 //
 // $ redis-cli smembers etf:F:/564c13b8f085fc471efdfff8/user_broadcast_277732900865/p/0
@@ -269,7 +350,7 @@ func modify_or_ignore(key []byte, ignore, modify *bool) {
 // 3) "2580601451761804672"
 
 // use zset instead of set for yunba tfs
-func yunba_tfs_set_to_zset_restore_cmd(c redigo.Conn, ignore *bool, modify *bool, key []byte, data []byte) error {
+func yunba_tfs_set_to_zset_restore_cmd(c redigo.Conn, ignore *bool, modify *bool, key []byte, data []byte, redisrt *goredis.Client) error {
 	//                 |  previous value    |    after value
 	//-----------------|--------------------|----------------------------------------------------------
 	// topic File      | set of File Slice  | zset of UIDs.
@@ -315,7 +396,17 @@ func yunba_tfs_set_to_zset_restore_cmd(c redigo.Conn, ignore *bool, modify *bool
 			for _, v := range value {
 //				sp[0].Score = 0
 //				sp[0].Member = v
-				c.Do("zadd", newKey, "0", v)
+				score := "0"
+				if redisrt != nil {
+//					fmt.Printf("read route table redis: %v\n", redisrt)
+					if routeItem, err := redisrt.Get(string(v)).Result(); err == nil {
+						fmt.Printf("get route table of %s: %s\n", string(v), routeItem)
+						score = routeTableStringToScore(routeItem)
+					} else {
+						fmt.Println("read route of %s table failed: %s", string(v), err.Error())
+					}
+				}
+				c.Do("zadd", newKey, score, v)
 			}
 		}
 	case rdb.String:
@@ -332,10 +423,24 @@ func yunba_tfs_set_to_zset_restore_cmd(c redigo.Conn, ignore *bool, modify *bool
 	return nil
 }
 
+func routeTableStringToScore(route string) string {
+	// route table format: <fonrt-tag>$<online-flag>
+	// online-flag: 1 - online, 0 - offline
+	score := "0"
+	split := strings.Split(route, "$")
+	if len(split) == 2 {
+		if split[1] == "1" {
+			score = fmt.Sprint(front_tag_to_score(split[0]))
+		}
+	}
+
+	return score
+}
+
 func yunba_tfs_sadd_cmd_to_zadd_cmd(args [][]byte) ([][]byte, error) {
 	// convert sadd to zadd
 	var ignore, modify bool
-	yunba_tfs_set_to_zset_restore_cmd(nil, &ignore, &modify, args[0], nil)
+	yunba_tfs_set_to_zset_restore_cmd(nil, &ignore, &modify, args[0], nil, nil)
 	fmt.Printf("ignore %v modify %v\n", ignore, modify)
 	if ignore == false {
 		if modify {
@@ -394,7 +499,7 @@ func set_key_to_zset_key(key []byte) ([]byte, error) {
 	return newKey, nil
 }
 
-func restoreRdbEntry(c redigo.Conn, e *rdb.BinEntry) {
+func restoreRdbEntry(c redigo.Conn, e *rdb.BinEntry, redisrt *goredis.Client) {
 	var ttlms uint64
 	if e.ExpireAt != 0 {
 		now := uint64(time.Now().Add(args.shift).UnixNano())
@@ -408,7 +513,7 @@ func restoreRdbEntry(c redigo.Conn, e *rdb.BinEntry) {
 
 	var ignore, modify bool
 
-	yunba_tfs_set_to_zset_restore_cmd(c, &ignore, &modify, e.Key, e.Value)
+	yunba_tfs_set_to_zset_restore_cmd(c, &ignore, &modify, e.Key, e.Value, redisrt)
 
 	ttlms = ttlms
 

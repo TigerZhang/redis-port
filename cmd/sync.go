@@ -274,7 +274,7 @@ func (cmd *cmdSync) SyncCommand(reader *bufio.Reader, target, passwd string) {
 		for {
 			resp := redis.MustDecode(reader)
 			scmd, args, err := redis.ParseArgs(resp)
-			fmt.Printf("cmd: %s args: %v\n", scmd, args)
+//			fmt.Printf("cmd: %s args: %v\n", scmd, args)
 			if err != nil {
 				log.PanicError(err, "parse command arguments failed")
 			} else if scmd != "ping" {
@@ -296,7 +296,7 @@ func (cmd *cmdSync) SyncCommand(reader *bufio.Reader, target, passwd string) {
 
 				if scmd == "sadd" {
 					// TODO: 1. extact to a function; 2. test case
-					fmt.Printf("sadd command\n")
+//					fmt.Printf("sadd command\n")
 					if zaddArgs, err := yunba_tfs_sadd_cmd_to_zadd_cmd(cmd.redisrt, args); err == nil {
 						if zaddArgs != nil {
 							s := make([]interface{}, len(zaddArgs))
@@ -306,14 +306,14 @@ func (cmd *cmdSync) SyncCommand(reader *bufio.Reader, target, passwd string) {
 							resp = redis.NewCommand("zadd", s...)
 						}
 
-						for i, a := range zaddArgs {
-							fmt.Printf("zsetArgs[%d]: %s\n", i, string(a))
-						}
+//						for i, a := range zaddArgs {
+//							fmt.Printf("zsetArgs[%d]: %s\n", i, string(a))
+//						}
 					} else  {
 						continue
 					}
 				} else if scmd == "srem" {
-					fmt.Printf("srem command\n")
+//					fmt.Printf("srem command\n")
 					if zremArgs, err := yunba_tfs_srem_cmd_to_zrem_cmd(args); err == nil {
 						if zremArgs != nil {
 							s := make([]interface{}, len(zremArgs))
@@ -322,9 +322,9 @@ func (cmd *cmdSync) SyncCommand(reader *bufio.Reader, target, passwd string) {
 							}
 							resp = redis.NewCommand("zrem", s...)
 						}
-						for i, a := range zremArgs {
-							fmt.Printf("zremArgs[%d]: %s\n", i, string(a))
-						}
+//						for i, a := range zremArgs {
+//							fmt.Printf("zremArgs[%d]: %s\n", i, string(a))
+//						}
 					} else {
 						continue
 					}
@@ -334,10 +334,10 @@ func (cmd *cmdSync) SyncCommand(reader *bufio.Reader, target, passwd string) {
 			cmd.forward.Incr()
 
 			scmd, args, err = redis.ParseArgs(resp)
-			fmt.Printf("resp scmd : %s\n", scmd)
-			for i, a := range args {
-				fmt.Printf("args[%d]: %s\n", i, a)
-			}
+//			fmt.Printf("resp scmd : %s\n", scmd)
+//			for i, a := range args {
+//				fmt.Printf("args[%d]: %s\n", i, a)
+//			}
 
 			redis.MustEncode(writer, resp)
 			flushWriter(writer)

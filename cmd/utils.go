@@ -419,7 +419,7 @@ func scoreFromRouteTable(redisrt *goredis.Client, uid string) string {
 	if redisrt != nil {
 		//					fmt.Printf("read route table redis: %v\n", redisrt)
 		if routeItem, err := redisrt.Get(uid).Result(); err == nil {
-			fmt.Printf("get route table of %s: %s\n", uid, routeItem)
+//			fmt.Printf("get route table of %s: %s\n", uid, routeItem)
 			score = routeTableStringToScore(routeItem)
 		} else {
 			fmt.Println("read route of %s table failed: %s", uid, err.Error())
@@ -447,11 +447,11 @@ func yunba_tfs_sadd_cmd_to_zadd_cmd(redisrt *goredis.Client, args [][]byte) ([][
 	// convert sadd to zadd
 	var ignore, modify bool
 	yunba_tfs_set_to_zset_restore_cmd(nil, &ignore, &modify, args[0], nil, nil)
-	fmt.Printf("ignore %v modify %v\n", ignore, modify)
+//	fmt.Printf("ignore %v modify %v\n", ignore, modify)
 	if ignore == false {
 		if modify {
 			newKey, _ := set_key_to_zset_key([]byte(args[0]))
-			fmt.Printf("newkey: %s\n", string(newKey))
+//			fmt.Printf("newkey: %s\n", string(newKey))
 
 			zsetArgs := make([][]byte, 0)
 			zsetArgs = append(zsetArgs, newKey)

@@ -297,7 +297,7 @@ func (cmd *cmdSync) SyncCommand(reader *bufio.Reader, target, passwd string) {
 				if scmd == "sadd" {
 					// TODO: 1. extact to a function; 2. test case
 					fmt.Printf("sadd command\n")
-					if zaddArgs, err := yunba_tfs_sadd_cmd_to_zadd_cmd(args); err == nil {
+					if zaddArgs, err := yunba_tfs_sadd_cmd_to_zadd_cmd(cmd.redisrt, args); err == nil {
 						if zaddArgs != nil {
 							s := make([]interface{}, len(zaddArgs))
 							for i := range zaddArgs {

@@ -396,16 +396,7 @@ func yunba_tfs_set_to_zset_restore_cmd(c redigo.Conn, ignore *bool, modify *bool
 			for _, v := range value {
 //				sp[0].Score = 0
 //				sp[0].Member = v
-				score := "0"
-				if redisrt != nil {
-//					fmt.Printf("read route table redis: %v\n", redisrt)
-					if routeItem, err := redisrt.Get(string(v)).Result(); err == nil {
-						fmt.Printf("get route table of %s: %s\n", string(v), routeItem)
-						score = routeTableStringToScore(routeItem)
-					} else {
-						fmt.Println("read route of %s table failed: %s", string(v), err.Error())
-					}
-				}
+				score := scoreFromRouteTable(redisrt, string(v))
 				c.Do("zadd", newKey, score, v)
 			}
 		}
@@ -423,6 +414,21 @@ func yunba_tfs_set_to_zset_restore_cmd(c redigo.Conn, ignore *bool, modify *bool
 	return nil
 }
 
+func scoreFromRouteTable(redisrt *goredis.Client, uid string) string {
+	score := "0"
+	if redisrt != nil {
+		//					fmt.Printf("read route table redis: %v\n", redisrt)
+		if routeItem, err := redisrt.Get(uid).Result(); err == nil {
+			fmt.Printf("get route table of %s: %s\n", uid, routeItem)
+			score = routeTableStringToScore(routeItem)
+		} else {
+			fmt.Println("read route of %s table failed: %s", uid, err.Error())
+		}
+	}
+
+	return score
+}
+
 func routeTableStringToScore(route string) string {
 	// route table format: <fonrt-tag>$<online-flag>
 	// online-flag: 1 - online, 0 - offline
@@ -437,7 +443,7 @@ func routeTableStringToScore(route string) string {
 	return score
 }
 
-func yunba_tfs_sadd_cmd_to_zadd_cmd(args [][]byte) ([][]byte, error) {
+func yunba_tfs_sadd_cmd_to_zadd_cmd(redisrt *goredis.Client, args [][]byte) ([][]byte, error) {
 	// convert sadd to zadd
 	var ignore, modify bool
 	yunba_tfs_set_to_zset_restore_cmd(nil, &ignore, &modify, args[0], nil, nil)
@@ -450,7 +456,8 @@ func yunba_tfs_sadd_cmd_to_zadd_cmd(args [][]byte) ([][]byte, error) {
 			zsetArgs := make([][]byte, 0)
 			zsetArgs = append(zsetArgs, newKey)
 			for _, elem := range args[1:] {
-				zsetArgs = append(zsetArgs, []byte{'0'})
+				score := scoreFromRouteTable(redisrt, string(elem))
+				zsetArgs = append(zsetArgs, []byte(score))
 				zsetArgs = append(zsetArgs, elem)
 			}
 

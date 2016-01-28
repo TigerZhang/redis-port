@@ -127,7 +127,7 @@ func Test_yunba_tfs_set_to_zset(t *testing.T) {
 	setArgs := make([][]byte, 0)
 	setArgs = append(setArgs, []byte(key_fs))
 	setArgs = append(setArgs, []byte{'1', '2'})
-	zsetArgs, err := yunba_tfs_sadd_cmd_to_zadd_cmd(setArgs)
+	zsetArgs, err := yunba_tfs_sadd_cmd_to_zadd_cmd(nil, setArgs)
 	assert.Must(err == nil)
 	fmt.Printf("zsetArgs key: %s\n", string(zsetArgs[0]))
 	assert.Must(reflect.DeepEqual(zsetArgs[0], []byte(key_fs_to_zset)))

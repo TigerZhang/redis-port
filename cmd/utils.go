@@ -476,7 +476,7 @@ func yunba_tfs_srem_cmd_to_zrem_cmd(args [][]byte) ([][]byte, error) {
 	if ignore == false {
 		if modify {
 			newKey, _ := set_key_to_zset_key(key)
-			fmt.Printf("newkey: %s\n", string(newKey))
+//			fmt.Printf("newkey: %s\n", string(newKey))
 
 			zremArgs := make([][]byte, 0)
 			zremArgs = append(zremArgs, newKey)
